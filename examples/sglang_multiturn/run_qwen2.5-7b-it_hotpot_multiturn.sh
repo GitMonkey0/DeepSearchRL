@@ -13,7 +13,7 @@ python3 -m verl.trainer.main_ppo \
     --config-name='hotpotqa_multiturn_grpo.yaml' \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=256 \
-    data.max_prompt_length=1024 \
+    data.max_prompt_length=2048 \
     data.max_response_length=4096 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \

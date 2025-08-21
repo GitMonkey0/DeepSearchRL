@@ -50,6 +50,7 @@ class RetrievalTool(BaseTool):
     @rollout_trace_op
     async def execute(self, instance_id: str, parameters: dict[str, Any], **kwargs) -> tuple[str, float, dict]:
         queries = parameters.get("queries", [])
+        
         if not isinstance(queries, list):
             queries = [str(queries)]
 
@@ -70,6 +71,7 @@ class RetrievalTool(BaseTool):
         async with aiohttp.ClientSession() as session:
             async with session.post(self.search_url, json=payload) as resp:
                 data = await resp.json()
+                
         return data.get("result", [])
 
     def _passages2string(self, retrieval_result: List[dict]) -> str:

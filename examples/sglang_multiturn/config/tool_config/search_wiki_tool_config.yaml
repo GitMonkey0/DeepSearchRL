@@ -2,7 +2,7 @@ tools:
   - class_name: "verl.tools.search_wiki_tool.RetrievalTool"
     config: 
       type: native
-      search_url: http://127.0.0.1:8000
+      search_url: http://127.0.0.1:8000/retrieve
       topk: 3
     tool_schema:
       type: "function"
