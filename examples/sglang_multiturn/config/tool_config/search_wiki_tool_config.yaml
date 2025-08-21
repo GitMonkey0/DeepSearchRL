@@ -1,0 +1,19 @@
+tools:
+  - class_name: "verl.tools.search_wiki_tool.RetrievalTool"
+    config: 
+      type: native
+      search_url: http://127.0.0.1:8000
+      topk: 3
+    tool_schema:
+      type: "function"
+      function:
+        name: "retrieve_documents"
+        description: "Retrieve relevant documents for given queries."
+        parameters:
+          type: "object"
+          properties:
+            queries:
+              type: "array"
+              items: {"type": "string"}
+              description: "List of search queries"
+          required: ["queries"]
