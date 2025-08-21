@@ -58,7 +58,7 @@ class RetrievalTool(BaseTool):
         formatted = [self._passages2string(res) for res in search_results]
         response_str = "\n\n".join(formatted)
 
-        return response_str[:500], 0.0, {}
+        return response_str[:1500], 0.0, {}
 
     async def calc_reward(self, instance_id: str, **kwargs) -> float:
         return 0.0
