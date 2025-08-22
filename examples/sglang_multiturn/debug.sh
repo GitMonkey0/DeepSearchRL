@@ -10,7 +10,7 @@ CONFIG_PATH="$PROJECT_DIR/examples/sglang_multiturn/config"
 
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
-    --config-name='hotpot_multiturn_grpo.yaml' \
+    --config-name='hotpotqa_multiturn_grpo.yaml' \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=4 \
     data.max_prompt_length=1024 \
@@ -47,8 +47,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=-1 \
     trainer.test_freq=20 \
     trainer.val_before_train=false \
-    data.train_files=data/nq/train.parquet \
-    data.val_files=data/nq/test.parquet \
+    data.train_files=data/hotpotqa/train.parquet \
+    data.val_files=data/hotpotqa/test.parquet \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="$PROJECT_DIR/examples/sglang_multiturn/config/tool_config/search_wiki_tool_config.yaml" \
     trainer.total_epochs=15 \
     actor_rollout_ref.rollout.update_weights_bucket_megabytes=512 $@
