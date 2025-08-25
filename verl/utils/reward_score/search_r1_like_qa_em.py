@@ -251,6 +251,11 @@ def is_valid_tool_call_string(s: str) -> bool:
     return True
 
 
+def has_unclosed_tool_call(s: str) -> bool:
+    """检测是否存在不闭合的tool_call标签"""
+    return ("<tool_call>" in s or "</tool_call>" in s) and not re.findall(r"<tool_call>(.*?)</tool_call>", s, flags=re.DOTALL)
+
+
 def normalize_answer(s):
     def remove_articles(text):
         return re.sub(r"\b(a|an|the)\b", " ", text)
@@ -325,31 +330,41 @@ def has_duplicate_tool_calls(s: str) -> bool:
 
 # ========== 合法性检测 ==========
 
-def check_legality(solution_str: str) -> bool:
-    """统一的合法性检测：tool_call + answer"""
+def check_legality(solution_str: str) -> tuple[bool, bool]:
+    """统一的合法性检测：tool_call + answer
+    返回 (is_legal, has_unclosed_tool_call)
+    """
     # ---- Tool call 检查 ----
+    has_unclosed = has_unclosed_tool_call(solution_str)
+    
     if not is_valid_tool_call_string(solution_str):
-        return False
+        return False, has_unclosed
     if has_duplicate_tool_calls(solution_str):
-        return False
+        return False, has_unclosed
 
     # ---- Answer 检查 ----
     open_count, close_count = count_answer_tags(solution_str)
     if open_count != 1 or close_count != 1:  # 必须严格只有一对
-        return False
+        return False, has_unclosed
 
     answer = extract_solution(solution_str)
     if answer is None:
-        return False
+        return False, has_unclosed
 
-    return True
+    return True, has_unclosed
 
 
 # ========== 质量检测 ==========
 
 def compute_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
     """精确匹配 (EM) 评分"""
-    if not check_legality(solution_str):
+    is_legal, has_unclosed = check_legality(solution_str)
+    
+    # 对不闭合的tool_call给予-1的严厉惩罚
+    if has_unclosed:
+        return -1
+    
+    if not is_legal:
         return 0
 
     answer = extract_solution(solution_str)
@@ -368,7 +383,13 @@ def compute_score(solution_str, ground_truth, method="strict", format_score=0.0,
 
 def compute_score_subem(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
     """子串匹配 (SubEM) 评分"""
-    if not check_legality(solution_str):
+    is_legal, has_unclosed = check_legality(solution_str)
+    
+    # 对不闭合的tool_call给予-1的严厉惩罚
+    if has_unclosed:
+        return -1
+    
+    if not is_legal:
         return 0
 
     answer = extract_solution(solution_str)
