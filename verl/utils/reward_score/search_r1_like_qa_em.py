@@ -1,3 +1,199 @@
+# # Copyright 2024 Bytedance Ltd. and/or its affiliates
+# # Copyright 2023-2024 SGLang Team
+# # Copyright 2025 Search-R1 Contributors
+# #
+# # Licensed under the Apache License, Version 2.0 (the "License");
+# # you may not use this file except in compliance with the License.
+# # You may obtain a copy of the License at
+# #
+# #     http://www.apache.org/licenses/LICENSE-2.0
+# #
+# # Unless required by applicable law or agreed to in writing, software
+# # distributed under the License is distributed on an "AS IS" BASIS,
+# # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# # See the License for the specific language governing permissions and
+# # limitations under the License.
+# # Adapted from https://github.com/PeterGriffinJin/Search-R1/blob/main/verl/utils/reward_score/qa_em.py
+
+# import random
+# import re
+# import string
+# import json
+
+# def is_valid_tool_call_string(s: str) -> bool:
+#     matches = re.findall(r"<tool_call>(.*?)</tool_call>", s, flags=re.DOTALL)
+    
+#     if not matches and ("<tool_call>" in s or "</tool_call>" in s):
+#         return False
+    
+#     for content in matches:
+#         content = content.replace("\n", "").strip()
+        
+#         try:
+#             data = json.loads(content)
+#         except Exception:
+#             return False  
+        
+#         if not isinstance(data, dict):
+#             return False
+#         if "name" not in data or "arguments" not in data:
+#             return False
+#         if not isinstance(data["name"], str):
+#             return False
+        
+#         arguments = data["arguments"]
+#         if not isinstance(arguments, dict):
+#             return False
+#         if set(arguments.keys()) != {"query"}:
+#             return False
+        
+#         query = arguments["query"]
+#         # if not isinstance(queries, list) or not all(isinstance(q, str) for q in queries):
+#         #     return False
+#         if not isinstance(query, str):
+#             return False
+    
+#     return True
+
+
+# def normalize_answer(s):
+#     def remove_articles(text):
+#         return re.sub(r"\b(a|an|the)\b", " ", text)
+
+#     def white_space_fix(text):
+#         return " ".join(text.split())
+
+#     def remove_punc(text):
+#         exclude = set(string.punctuation)
+#         return "".join(ch for ch in text if ch not in exclude)
+
+#     def lower(text):
+#         return text.lower()
+
+#     return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+
+# def em_check(prediction, golden_answers):
+#     if isinstance(golden_answers, str):
+#         golden_answers = [golden_answers]
+#     normalized_prediction = normalize_answer(prediction)
+#     score = 0
+#     for golden_answer in golden_answers:
+#         golden_answer = normalize_answer(golden_answer)
+#         if golden_answer == normalized_prediction:
+#             score = 1
+#             break
+#     return score
+
+
+# def subem_check(prediction, golden_answers):
+#     if isinstance(golden_answers, str):
+#         golden_answers = [golden_answers]
+#     normalized_prediction = normalize_answer(prediction)
+#     score = 0
+#     for golden_answer in golden_answers:
+#         golden_answer = normalize_answer(golden_answer)
+#         if golden_answer in normalized_prediction:
+#             score = 1
+#             break
+#     return score
+
+
+# def extract_solution(solution_str):
+#     """Extract the equation from the solution string."""
+#     # Remove everything before the first "Assistant:"
+#     # if "Assistant:" in solution_str:
+#     #     solution_str = solution_str.split("Assistant:", 1)[1]
+#     # elif "<|im_start|>assistant" in solution_str:
+#     #     solution_str = solution_str.split("<|im_start|>assistant", 1)[1]
+#     # else:
+#     #     return None
+#     # solution_str = solution_str.split('\n')[-1]
+
+#     answer_pattern = r"<answer>(.*?)</answer>"
+#     match = re.finditer(answer_pattern, solution_str, re.DOTALL)
+#     matches = list(match)
+
+#     # If there are 0  matches, return None
+#     if len(matches) < 1:
+#         return None
+
+#     # If there are 2 or more matches, return the last one
+#     return matches[-1].group(1).strip()
+
+
+# def count_answer_tags(text):
+#     opening_tags = text.count("<answer>")
+#     closing_tags = text.count("</answer>")
+
+#     return opening_tags, closing_tags
+
+
+# def compute_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
+#     """The scoring function for exact match (EM).
+
+#     Args:
+#         solution_str: the solution text
+#         ground_truth: the ground truth
+#         method: the method to extract the solution, choices are 'strict' and 'flexible'
+#         format_score: the score for the format
+#         score: the score for the correct answer
+#     """
+#     if not is_valid_tool_call_string(solution_str):
+#         return 0
+
+#     answer = extract_solution(solution_str=solution_str)
+#     open_count, close_count = count_answer_tags(solution_str)
+#     do_print = random.randint(1, 64) == 1
+#     if do_print:
+#         print("--------------------------------")
+#         print(f"Golden answers: {ground_truth['target']}")
+#         if answer is not None:
+#             print(f"Extracted answer is not None: {answer}")
+#         else:
+#             print("Extracted answer: None!")
+#         print(f"Solution string: {solution_str}")
+
+#     if answer is None:
+#         return 0
+#     else:
+#         if em_check(answer, ground_truth["target"]):
+#             if open_count > 10 or close_count > 10:  # prevent output a lot of </answer>
+#                 score = score / 4
+#                 return score
+#             return score
+#         else:
+#             return format_score
+
+
+# def compute_score_subem(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
+#     """The scoring function for substring exact match (EM).
+
+#     Args:
+#         solution_str: the solution text
+#         ground_truth: the ground truth
+#         method: the method to extract the solution, choices are 'strict' and 'flexible'
+#         format_score: the score for the format
+#         score: the score for the correct answer
+#     """
+#     answer = extract_solution(solution_str=solution_str)
+#     do_print = random.randint(1, 64) == 1
+
+#     if do_print:
+#         print("--------------------------------")
+#         print(f"Golden answers: {ground_truth['target']}")
+#         print(f"Extracted answer: {answer}")
+#         print(f"Solution string: {solution_str}")
+
+#     if answer is None:
+#         return 0
+#     else:
+#         if subem_check(answer, ground_truth["target"]):
+#             return score
+#         else:
+#             return format_score
+
+
 # Copyright 2024 Bytedance Ltd. and/or its affiliates
 # Copyright 2023-2024 SGLang Team
 # Copyright 2025 Search-R1 Contributors
@@ -6,53 +202,52 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0 
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Adapted from https://github.com/PeterGriffinJin/Search-R1/blob/main/verl/utils/reward_score/qa_em.py
+# Adapted from https://github.com/PeterGriffinJin/Search-R1/blob/main/verl/utils/reward_score/qa_em.py 
 
 import random
 import re
 import string
 import json
 
+
 def is_valid_tool_call_string(s: str) -> bool:
     matches = re.findall(r"<tool_call>(.*?)</tool_call>", s, flags=re.DOTALL)
-    
+
     if not matches and ("<tool_call>" in s or "</tool_call>" in s):
         return False
-    
+
     for content in matches:
         content = content.replace("\n", "").strip()
-        
+
         try:
             data = json.loads(content)
         except Exception:
             return False  
-        
+
         if not isinstance(data, dict):
             return False
         if "name" not in data or "arguments" not in data:
             return False
         if not isinstance(data["name"], str):
             return False
-        
+
         arguments = data["arguments"]
         if not isinstance(arguments, dict):
             return False
         if set(arguments.keys()) != {"query"}:
             return False
-        
+
         query = arguments["query"]
-        # if not isinstance(queries, list) or not all(isinstance(q, str) for q in queries):
-        #     return False
         if not isinstance(query, str):
             return False
-    
+
     return True
 
 
@@ -100,95 +295,92 @@ def subem_check(prediction, golden_answers):
 
 
 def extract_solution(solution_str):
-    """Extract the equation from the solution string."""
-    # Remove everything before the first "Assistant:"
-    # if "Assistant:" in solution_str:
-    #     solution_str = solution_str.split("Assistant:", 1)[1]
-    # elif "<|im_start|>assistant" in solution_str:
-    #     solution_str = solution_str.split("<|im_start|>assistant", 1)[1]
-    # else:
-    #     return None
-    # solution_str = solution_str.split('\n')[-1]
-
+    """Extract the answer from the solution string."""
     answer_pattern = r"<answer>(.*?)</answer>"
     match = re.finditer(answer_pattern, solution_str, re.DOTALL)
     matches = list(match)
 
-    # If there are 0  matches, return None
     if len(matches) < 1:
         return None
-
-    # If there are 2 or more matches, return the last one
     return matches[-1].group(1).strip()
 
 
 def count_answer_tags(text):
     opening_tags = text.count("<answer>")
     closing_tags = text.count("</answer>")
-
     return opening_tags, closing_tags
 
 
-def compute_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
-    """The scoring function for exact match (EM).
+def get_tool_call_contents(s: str):
+    """提取所有 <tool_call>...</tool_call> 的内容"""
+    return re.findall(r"<tool_call>(.*?)</tool_call>", s, flags=re.DOTALL)
 
-    Args:
-        solution_str: the solution text
-        ground_truth: the ground truth
-        method: the method to extract the solution, choices are 'strict' and 'flexible'
-        format_score: the score for the format
-        score: the score for the correct answer
-    """
+
+def has_duplicate_tool_calls(s: str) -> bool:
+    """判断是否存在完全重复的 tool_call 内容"""
+    contents = get_tool_call_contents(s)
+    normalized = [c.replace("\n", "").strip() for c in contents]
+    return len(normalized) != len(set(normalized))
+
+
+# ========== 合法性检测 ==========
+
+def check_legality(solution_str: str) -> bool:
+    """统一的合法性检测：tool_call + answer"""
+    # ---- Tool call 检查 ----
     if not is_valid_tool_call_string(solution_str):
-        return 0
+        return False
+    if has_duplicate_tool_calls(solution_str):
+        return False
 
-    answer = extract_solution(solution_str=solution_str)
+    # ---- Answer 检查 ----
     open_count, close_count = count_answer_tags(solution_str)
-    do_print = random.randint(1, 64) == 1
-    if do_print:
-        print("--------------------------------")
-        print(f"Golden answers: {ground_truth['target']}")
-        if answer is not None:
-            print(f"Extracted answer is not None: {answer}")
-        else:
-            print("Extracted answer: None!")
-        print(f"Solution string: {solution_str}")
+    if open_count != 1 or close_count != 1:  # 必须严格只有一对
+        return False
 
+    answer = extract_solution(solution_str)
     if answer is None:
+        return False
+
+    return True
+
+
+# ========== 质量检测 ==========
+
+def compute_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
+    """精确匹配 (EM) 评分"""
+    if not check_legality(solution_str):
         return 0
-    else:
-        if em_check(answer, ground_truth["target"]):
-            if open_count > 10 or close_count > 10:  # prevent output a lot of </answer>
-                score = score / 4
-                return score
-            return score
-        else:
-            return format_score
 
-
-def compute_score_subem(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
-    """The scoring function for substring exact match (EM).
-
-    Args:
-        solution_str: the solution text
-        ground_truth: the ground truth
-        method: the method to extract the solution, choices are 'strict' and 'flexible'
-        format_score: the score for the format
-        score: the score for the correct answer
-    """
-    answer = extract_solution(solution_str=solution_str)
+    answer = extract_solution(solution_str)
     do_print = random.randint(1, 64) == 1
-
     if do_print:
         print("--------------------------------")
         print(f"Golden answers: {ground_truth['target']}")
         print(f"Extracted answer: {answer}")
         print(f"Solution string: {solution_str}")
 
-    if answer is None:
+    raw_score = score if em_check(answer, ground_truth["target"]) else format_score
+
+    n_tool_calls = len(get_tool_call_contents(solution_str))
+    return raw_score / (n_tool_calls + 1)
+
+
+def compute_score_subem(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
+    """子串匹配 (SubEM) 评分"""
+    if not check_legality(solution_str):
         return 0
-    else:
-        if subem_check(answer, ground_truth["target"]):
-            return score
-        else:
-            return format_score
+
+    answer = extract_solution(solution_str)
+    do_print = random.randint(1, 64) == 1
+    if do_print:
+        print("--------------------------------")
+        print(f"Golden answers: {ground_truth['target']}")
+        print(f"Extracted answer: {answer}")
+        print(f"Solution string: {solution_str}")
+
+    raw_score = score if subem_check(answer, ground_truth["target"]) else format_score
+
+    # tool_call 数量惩罚
+    n_tool_calls = len(get_tool_call_contents(solution_str))
+    return raw_score / (n_tool_calls + 1)
