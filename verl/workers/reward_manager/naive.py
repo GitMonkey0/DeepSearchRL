@@ -50,7 +50,6 @@ class NaiveRewardManager:
                 return {"reward_tensor": data.batch["rm_scores"]}
             else:
                 return data.batch["rm_scores"]
-
         reward_tensor = torch.zeros_like(data.batch["responses"], dtype=torch.float32)
         reward_extra_info = defaultdict(list)
 

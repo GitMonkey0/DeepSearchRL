@@ -18,6 +18,40 @@
 import random
 import re
 import string
+import json
+
+def is_valid_tool_call_string(s: str) -> bool:
+    matches = re.findall(r"<tool_call>(.*?)</tool_call>", s, flags=re.DOTALL)
+    
+    if not matches and ("<tool_call>" in s or "</tool_call>" in s):
+        return False
+    
+    for content in matches:
+        content = content.replace("\n", "").strip()
+        
+        try:
+            data = json.loads(content)
+        except Exception:
+            return False  
+        
+        if not isinstance(data, dict):
+            return False
+        if "name" not in data or "arguments" not in data:
+            return False
+        if not isinstance(data["name"], str):
+            return False
+        
+        arguments = data["arguments"]
+        if not isinstance(arguments, dict):
+            return False
+        if set(arguments.keys()) != {"queries"}:
+            return False
+        
+        queries = arguments["queries"]
+        if not isinstance(queries, list) or not all(isinstance(q, str) for q in queries):
+            return False
+    
+    return True
 
 
 def normalize_answer(s):
@@ -103,10 +137,12 @@ def compute_score(solution_str, ground_truth, method="strict", format_score=0.0,
         format_score: the score for the format
         score: the score for the correct answer
     """
+    if not is_valid_tool_call_string(solution_str):
+        return 0
+
     answer = extract_solution(solution_str=solution_str)
     open_count, close_count = count_answer_tags(solution_str)
     do_print = random.randint(1, 64) == 1
-
     if do_print:
         print("--------------------------------")
         print(f"Golden answers: {ground_truth['target']}")

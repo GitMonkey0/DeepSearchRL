@@ -1121,7 +1121,6 @@ class RayPPOTrainer:
         self.global_steps += 1
         last_val_metrics = None
         self.max_steps_duration = 0
-        i = 0
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
                 metrics = {}
@@ -1170,13 +1169,6 @@ class RayPPOTrainer:
                             gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
                         else:
                             gen_batch_output = self.async_rollout_manager.generate_sequences(gen_batch)
-                        if i == 0:
-                            a = self.tokenizer.batch_decode(gen_batch_output.batch["input_ids"], skip_special_tokens=False)
-                            b = self.tokenizer.batch_decode(gen_batch.batch["input_ids"], skip_special_tokens=False)
-                            import json
-                            json.dump(a, open("out_list.json", "w", encoding="utf-8"), ensure_ascii=False)
-                            json.dump(b, open("input_list.json", "w", encoding="utf-8"), ensure_ascii=False)
-                            i += 1
                             
                         timing_raw.update(gen_batch_output.meta_info["timing"])
                         gen_batch_output.meta_info.pop("timing", None)
