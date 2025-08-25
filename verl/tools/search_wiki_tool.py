@@ -80,7 +80,7 @@ class RetrievalTool(BaseTool):
 
     @rollout_trace_op
     async def execute(self, instance_id: str, parameters: dict[str, Any], **kwargs) -> tuple[str, float, dict]:
-        query = parameters.get("queries", "")
+        query = parameters.get("query", "")
         if not isinstance(query, str):
             query = str(query)
 
