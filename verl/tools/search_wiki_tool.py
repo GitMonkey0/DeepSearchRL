@@ -34,7 +34,7 @@ class RetrievalTool(BaseTool):
                         "queries": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of search queries"
+                            "description": "A list containing exactly one search query string."
                         }
                     },
                     "required": ["queries"]

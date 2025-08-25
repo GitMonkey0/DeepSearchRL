@@ -11,14 +11,14 @@ CONFIG_PATH="$PROJECT_DIR/examples/sglang_multiturn/config"
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='hotpotqa_multiturn_grpo.yaml' \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=gae \
     data.train_batch_size=512 \
     data.max_prompt_length=1024 \
     data.max_response_length=4096 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.return_raw_chat=True \
-    actor_rollout_ref.model.path=../../ckpt/Qwen/Qwen2.5-7B-Instruct \
+    actor_rollout_ref.model.path=../../ckpt/Qwen/Qwen2.5-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=256 \
@@ -34,14 +34,22 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=sglang \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
-    actor_rollout_ref.rollout.n=5 \
+    actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.ref.log_prob_micro_batch_size=128 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
+    critic.optim.lr=1e-5 \
+    critic.model.use_remove_padding=True \
+    critic.optim.lr_warmup_steps_ratio=0.015 \
+    critic.model.path=../../ckpt/Qwen/Qwen2.5-3B-Instruct \
+    critic.model.enable_gradient_checkpointing=true \
+    critic.ppo_micro_batch_size_per_gpu=8 \
+    critic.model.fsdp_config.param_offload=false \
+    critic.model.fsdp_config.optimizer_offload=false \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger='["console","wandb"]' \
     trainer.project_name='hotpotqa_async_rl' \
-    trainer.experiment_name='qwen2.5-7b-it_function_rm-hotpotqa-sgl-multi-w-tool-verify-n5' \
+    trainer.experiment_name='qwen2.5-3b-it_function_rm-hotpotqa-sgl-multi-w-tool-verify-ppo' \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=25 \
@@ -52,4 +60,3 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="$PROJECT_DIR/examples/sglang_multiturn/config/tool_config/search_wiki_tool_config.yaml" \
     trainer.total_epochs=1 \
     actor_rollout_ref.rollout.update_weights_bucket_megabytes=512 $@
-
