@@ -377,8 +377,9 @@ def compute_score(solution_str, ground_truth, method="strict", format_score=0.0,
 
     raw_score = score if em_check(answer, ground_truth["target"]) else format_score
 
-    n_tool_calls = len(get_tool_call_contents(solution_str))
-    return raw_score / (n_tool_calls + 1)
+    return raw_score
+    # n_tool_calls = len(get_tool_call_contents(solution_str))
+    # return raw_score / (n_tool_calls + 1)
 
 
 def compute_score_subem(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
