@@ -22,22 +22,40 @@ class RetrievalTool(BaseTool):
         self.search_url = config["search_url"]
         self.topk = config["topk"]
 
+    # def get_openai_tool_schema(self) -> OpenAIFunctionToolSchema:
+    #     return OpenAIFunctionToolSchema.model_validate({
+    #         "type": "function",
+    #         "function": {
+    #             "name": "retrieve_documents",
+    #             "description": "Retrieve relevant documents for given queries.",
+    #             "parameters": {
+    #                 "type": "object",
+    #                 "properties": {
+    #                     "queries": {
+    #                         "type": "array",
+    #                         "items": {"type": "string"},
+    #                         "description": "A list containing exactly one search query string."
+    #                     }
+    #                 },
+    #                 "required": ["queries"]
+    #             }
+    #         }
+    #     })
     def get_openai_tool_schema(self) -> OpenAIFunctionToolSchema:
         return OpenAIFunctionToolSchema.model_validate({
             "type": "function",
             "function": {
                 "name": "retrieve_documents",
-                "description": "Retrieve relevant documents for given queries.",
+                "description": "Retrieve relevant documents for given query.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "queries": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "A list containing exactly one search query string."
+                        "query": {
+                            "type": "string",          
+                            "description": "A single search query string."
                         }
                     },
-                    "required": ["queries"]
+                    "required": ["query"]
                 }
             }
         })
@@ -47,14 +65,26 @@ class RetrievalTool(BaseTool):
             instance_id = str(uuid.uuid4())
         return instance_id
 
+    # @rollout_trace_op
+    # async def execute(self, instance_id: str, parameters: dict[str, Any], **kwargs) -> tuple[str, float, dict]:
+    #     queries = parameters.get("queries", [])
+        
+    #     if not isinstance(queries, list):
+    #         queries = [str(queries)]
+
+    #     search_results = await self._batch_search(queries)
+    #     formatted = [self._passages2string(res) for res in search_results]
+    #     response_str = "\n\n".join(formatted)
+
+    #     return response_str[:2000], 0.0, {}
+
     @rollout_trace_op
     async def execute(self, instance_id: str, parameters: dict[str, Any], **kwargs) -> tuple[str, float, dict]:
-        queries = parameters.get("queries", [])
-        
-        if not isinstance(queries, list):
-            queries = [str(queries)]
+        query = parameters.get("queries", "")
+        if not isinstance(query, str):
+            query = str(query)
 
-        search_results = await self._batch_search(queries)
+        search_results = await self._batch_search([query])
         formatted = [self._passages2string(res) for res in search_results]
         response_str = "\n\n".join(formatted)
 

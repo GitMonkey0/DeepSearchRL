@@ -44,11 +44,13 @@ def is_valid_tool_call_string(s: str) -> bool:
         arguments = data["arguments"]
         if not isinstance(arguments, dict):
             return False
-        if set(arguments.keys()) != {"queries"}:
+        if set(arguments.keys()) != {"query"}:
             return False
         
-        queries = arguments["queries"]
-        if not isinstance(queries, list) or not all(isinstance(q, str) for q in queries):
+        query = arguments["query"]
+        # if not isinstance(queries, list) or not all(isinstance(q, str) for q in queries):
+        #     return False
+        if not isinstance(query, str):
             return False
     
     return True
