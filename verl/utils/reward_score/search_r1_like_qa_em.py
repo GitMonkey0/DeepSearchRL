@@ -1,6 +1,7 @@
 import re
 import json
 from typing import List, Union, Dict
+import random
 
 # =================================================================
 # F1 Score Calculation Helpers
@@ -110,30 +111,36 @@ def is_legal(solution_str: str) -> bool:
 def compute_score(solution_str: str, ground_truth: Dict) -> float:
     """
     Computes the final score for a given solution string based on legality and F1 score.
-    
     - Returns -1.0 for any illegally formatted solution string.
-    - Otherwise, returns the maximum F1 score between the extracted answer 
+    - Otherwise, returns the maximum F1 score between the extracted answer
       and the list of possible golden answers.
     """
     # First, validate the entire format of the solution string.
+    do_print = random.randint(1, 64) == 1
+    predicted_answer = extract_solution(solution_str)
+
+    if do_print:
+        print("--------------------------------")
+        print(f"Golden answers: {ground_truth['target']}")
+        if predicted_answer is not None:
+            print(f"Extracted answer is not None: {predicted_answer}")
+        else:
+            print("Extracted answer: None!")
+        print(f"Solution string: {solution_str}")
+
     if not is_legal(solution_str):
         return -1.0
 
-    # If legal, extract the predicted answer.
-    predicted_answer = extract_solution(solution_str)
-    
     # Ensure the golden answers from the ground truth are in a list.
     golden_answers = ground_truth.get("target")
     if isinstance(golden_answers, str):
         golden_answers = [golden_answers]
-        
     if not golden_answers:
         # If there are no golden answers, score is 1.0 if prediction is also empty, else 0.0.
         return 1.0 if not predicted_answer.strip() else 0.0
 
     # Calculate F1 against each possible golden answer and take the highest score.
     max_f1 = max(f1_single(predicted_answer, gold) for gold in golden_answers)
-    
     return max_f1
 
 
