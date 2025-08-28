@@ -18,6 +18,7 @@ Metrics related to the PPO trainer.
 from collections import defaultdict
 from functools import partial
 from typing import Any, Callable
+import re
 
 import numpy as np
 import torch
@@ -76,6 +77,32 @@ def _compute_response_info(batch: DataProto) -> dict[str, Any]:
         response_length=response_length,
     )
 
+def compute_deepsearch_metrics(batch: DataProto, tokenizer) -> dict[str, float]:
+    """
+    Computes deepsearch metrics for a batch.
+
+    Statistics include mean, min, max, std of <tool_call> depth.
+    """
+    responses_str = tokenizer.batch_decode(
+        batch.batch["responses"], skip_special_tokens=True
+    )
+
+    depths = [len(re.findall(r"<tool_call>.*?</tool_call>", resp, flags=re.DOTALL)) 
+              for resp in responses_str]
+
+    if len(depths) == 0:
+        depths = [0]
+
+    depths_tensor = torch.tensor(depths, dtype=torch.float32)
+
+    metrics = {
+        "deepsearch/search_depth/mean": torch.mean(depths_tensor).item(),
+        "deepsearch/search_depth/min": torch.min(depths_tensor).item(),
+        "deepsearch/search_depth/max": torch.max(depths_tensor).item(),
+        "deepsearch/search_depth/std": torch.std(depths_tensor).item(),
+    }
+
+    return metrics
 
 def compute_data_metrics(batch: DataProto, use_critic: bool = True) -> dict[str, Any]:
     """
