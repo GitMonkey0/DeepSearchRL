@@ -821,6 +821,8 @@ class RayPPOTrainer:
             metric_dict["val-aux/num_turns/max"] = sample_turns.max()
             metric_dict["val-aux/num_turns/mean"] = sample_turns.mean()
 
+        clipped_reward_mean = np.mean([max(0.0, s) for s in sample_scores])
+        metric_dict["val-core/clipped_reward_mean"] = float(clipped_reward_mean)
         return metric_dict
 
     def init_workers(self):
