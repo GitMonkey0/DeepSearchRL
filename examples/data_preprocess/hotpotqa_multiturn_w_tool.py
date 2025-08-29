@@ -43,7 +43,7 @@ def build_split(data_source: str, split: str, template_type: str):
     ds = datasets.load_dataset('RUC-NLPIR/FlashRAG_datasets', data_source)[split]
 
     if split == 'train':
-        ds = ds.select(range(min(25600, len(ds))))
+        ds = ds.select(range(min(51200, len(ds))))
 
     def process_fn(example, idx):
         example['question'] = example['question'].strip()

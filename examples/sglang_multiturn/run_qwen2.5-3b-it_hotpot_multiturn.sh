@@ -13,6 +13,7 @@ python3 -m verl.trainer.main_ppo \
     --config-name='hotpotqa_multiturn_grpo.yaml' \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=512 \
+    data.val_batch_size=256 \
     data.max_prompt_length=1024 \
     data.max_response_length=4096 \
     data.filter_overlong_prompts=True \
@@ -44,8 +45,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.experiment_name='qwen2.5-3b-it_function_rm-hotpotqa-sgl-multi-w-tool-verify-n5' \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
-    trainer.save_freq=25 \
-    trainer.test_freq=25 \
+    trainer.save_freq=50 \
+    trainer.test_freq=10 \
     trainer.val_before_train=false \
     data.train_files=data/hotpotqa/train.parquet \
     data.val_files=data/hotpotqa/test.parquet \
