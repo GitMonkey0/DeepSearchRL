@@ -898,10 +898,12 @@ class SGLangRollout(BaseRollout):
                         try:
                             normed_content, tool_calls = self._function_call_parser.parse_non_stream(content)
                         except JSONDecodeError:
-                            normed_content = content
+                            # normed_content = content
+                            normed_content = ""
                             tool_calls = []
                         except AttributeError:
-                            normed_content = content
+                            # normed_content = content
+                            normed_content = ""
                             tool_calls = []
                         parsed_tool_calls = []
                         for tool_call in tool_calls:
