@@ -98,11 +98,14 @@ class RetrievalTool(BaseTool):
 
     async def _batch_search(self, queries: List[str]) -> List[List[dict]]:
         payload = {"queries": queries, "topk": self.topk, "return_scores": True}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(self.search_url, json=payload) as resp:
-                data = await resp.json()
-                
-        return data.get("result", [])
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(self.search_url, json=payload) as resp:
+                    data = await resp.json()
+
+            return data.get("result", [])
+        except:
+            return []
 
     def _passages2string(self, retrieval_result: List[dict]) -> str:
         parts = []
