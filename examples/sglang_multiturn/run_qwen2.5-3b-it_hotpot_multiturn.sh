@@ -46,7 +46,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=50 \
-    trainer.test_freq=10 \
+    trainer.test_freq=20 \
     trainer.val_before_train=false \
     data.train_files=data/hotpotqa/train.parquet \
     data.val_files=data/hotpotqa/test.parquet \
