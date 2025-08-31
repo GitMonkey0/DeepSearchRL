@@ -31,7 +31,7 @@ def make_prefix(dp, template_type):
             f"You may call retrieve_documents whenever you need more information. "
             f"When ready, put the final answer between <answer> and </answer>. "
             f"After </answer>, you may add a short note if uncertain. "
-            f"If deeper reflection is truly necessary, add [reflect] at the end; otherwise, do not include it. "
+            f"If deeper reflection is truly necessary, add [reflect] at the end to enable a new round of reasoning with optional tool usage; otherwise, do not include it. "
             f"Question: {question}\n"
         )
     else:
