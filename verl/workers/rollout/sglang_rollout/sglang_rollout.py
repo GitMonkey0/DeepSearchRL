@@ -947,6 +947,10 @@ class SGLangRollout(BaseRollout):
                             if "[reflect]" in content:
                                 if not reflect_flag:
                                     _req.state = AsyncRolloutRequestStateEnum.RUNNING
+                                    _req.add_user_message(
+                                        self.processing_class,
+                                        "Okay, you can reflect only once.",
+                                    )
                                     reflect_flag = True
                                 else:
                                     break
