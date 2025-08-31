@@ -925,10 +925,10 @@ class SGLangRollout(BaseRollout):
                                 self.processing_class, normed_content, tool_calls=parsed_tool_calls
                             )
                         else:
-                            _req.add_assistant_message(self.processing_class, "")
-                            finish_reason_type = FinishReasonTypeEnum.STOP
-                            _req.state = AsyncRolloutRequestStateEnum.COMPLETED
-                            break
+                            _req.add_assistant_message(self.processing_class, "I made a formatting error when trying to call the tool. Let me retry with the correct format.")
+                            # finish_reason_type = FinishReasonTypeEnum.STOP
+                            # _req.state = AsyncRolloutRequestStateEnum.COMPLETED
+                            # break
                     else:
                         _req.add_assistant_message(
                             self.processing_class,
