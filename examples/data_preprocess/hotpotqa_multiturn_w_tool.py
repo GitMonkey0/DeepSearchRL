@@ -29,9 +29,9 @@ def make_prefix(dp, template_type):
         prefix = (
             f"Answer the question step by step. "
             f"You may call retrieve_documents whenever you need more information. "
-            f"When you are ready, put the final answer between <answer> and </answer>, "
-            f"e.g. <answer>Beijing</answer>. "
-            f"If after giving the answer you still feel uncertain, you may optionally add your reflection between <reflect> and </reflect>. "
+            f"When ready, put the final answer between <answer> and </answer>. "
+            f"After </answer>, you may add a short note if uncertain. "
+            f"If deeper reflection is truly necessary, add <reflect> at the end; otherwise, do not include it. "
             f"Question: {question}\n"
         )
     else:

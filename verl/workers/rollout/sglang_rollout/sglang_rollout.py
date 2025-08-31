@@ -943,7 +943,10 @@ class SGLangRollout(BaseRollout):
                         ):
                             _req.state = AsyncRolloutRequestStateEnum.INTERACTING
                         else:
-                            break
+                            if "<reflect>" in content:
+                                _req.state = AsyncRolloutRequestStateEnum.RUNNING
+                            else:
+                                break
             elif _req.state == AsyncRolloutRequestStateEnum.INTERACTING:
                 user_turns += 1
                 messages = [{"role": x.role, "content": x.content} for x in _req.messages]
