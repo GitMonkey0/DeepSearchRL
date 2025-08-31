@@ -833,7 +833,7 @@ class SGLangRollout(BaseRollout):
 
         # Update with any additional kwargs
         request_sampling_params.update(kwargs)
-
+        reflect_flag = False
         while current_turns < self.config.multi_turn.max_assistant_turns:
             if _req.state == AsyncRolloutRequestStateEnum.PENDING:
                 await self._handle_pending_state(_req)
@@ -943,8 +943,12 @@ class SGLangRollout(BaseRollout):
                         ):
                             _req.state = AsyncRolloutRequestStateEnum.INTERACTING
                         else:
-                            if "<reflect>" in content:
-                                _req.state = AsyncRolloutRequestStateEnum.RUNNING
+                            if "[reflect]" in content:
+                                if not reflect_flag:
+                                    _req.state = AsyncRolloutRequestStateEnum.RUNNING
+                                    reflect_flag = True
+                                else:
+                                    break
                             else:
                                 break
             elif _req.state == AsyncRolloutRequestStateEnum.INTERACTING:
