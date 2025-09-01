@@ -31,7 +31,7 @@ def make_prefix(dp, template_type):
             f"You may call retrieve_documents whenever you need more information. "
             f"When ready, put the final answer between <answer> and </answer>. "
             f"e.g. <answer>Beijing</answer>. "
-            f"If you still feel uncertain after </answer>, you may call retrieve_documents again to get more information. "
+            f"If you still feel uncertain after </answer>, you may reflect and provide a revised answer. During reflection, if you realize you need more information, you may call retrieve_documents again."
             f"Question: {question}\n"
         )
     else:
