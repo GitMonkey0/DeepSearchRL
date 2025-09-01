@@ -944,18 +944,18 @@ class SGLangRollout(BaseRollout):
                         ):
                             _req.state = AsyncRolloutRequestStateEnum.INTERACTING
                         else:
-                            if "[reflect]" in content:
-                                if not reflect_flag:
-                                    _req.state = AsyncRolloutRequestStateEnum.RUNNING
-                                    _req.add_user_message(
-                                        self.processing_class,
-                                        "Okay, you can reflect only once.",
-                                    )
-                                    reflect_flag = True
-                                else:
-                                    break
-                            else:
-                                break
+                            # if "[reflect]" in content:
+                            #     if not reflect_flag:
+                            #         _req.state = AsyncRolloutRequestStateEnum.RUNNING
+                            #         _req.add_user_message(
+                            #             self.processing_class,
+                            #             "Okay, you can reflect only once.",
+                            #         )
+                            #         reflect_flag = True
+                            #     else:
+                            #         break
+                            # else:
+                            break
             elif _req.state == AsyncRolloutRequestStateEnum.INTERACTING:
                 user_turns += 1
                 messages = [{"role": x.role, "content": x.content} for x in _req.messages]
