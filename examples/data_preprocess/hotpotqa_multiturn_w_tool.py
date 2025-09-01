@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0 
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +29,7 @@ def make_prefix(dp, template_type):
         prefix = (
             f"Answer the question step by step. "
             f"You may call retrieve_documents whenever you need more information. "
-            f"When you are ready, put the final answer between <answer> and </answer>, "
+            f"When ready, put the final answer between <answer> and </answer>. "
             f"e.g. <answer>Beijing</answer>. "
             f"Question: {question}\n"
         )
@@ -38,12 +38,13 @@ def make_prefix(dp, template_type):
     return prefix
 
 
-def build_split(data_source: str, split: str, template_type: str):
+def build_split(data_source: str, split: str, template_type: str, sample_train_size: int = None):
     """Load one split and map it to the common format."""
     ds = datasets.load_dataset('RUC-NLPIR/FlashRAG_datasets', data_source)[split]
 
-    if split == 'train':
-        ds = ds.select(range(min(51200, len(ds))))
+    # only subsample train set if needed
+    if split == 'train' and sample_train_size is not None:
+        ds = ds.select(range(min(sample_train_size, len(ds))))
 
     def process_fn(example, idx):
         example['question'] = example['question'].strip()
@@ -76,15 +77,27 @@ if __name__ == "__main__":
     parser.add_argument("--local_dir", default="./data/hotpotqa")
     parser.add_argument("--hdfs_dir", default=None)
     parser.add_argument("--template_type", type=str, default="base")
-    parser.add_argument("--data_sources", default="hotpotqa")
+    parser.add_argument("--train_data_sources", default="hotpotqa",
+                        help="Comma separated list of data sources for training")
+    parser.add_argument("--test_data_sources", default="nq,hotpotqa",
+                        help="Comma separated list of data sources for testing")
+    parser.add_argument("--sample_train_size", type=int, default=51200,
+                        help="Number of training samples to subsample (None for full set)")
 
     args = parser.parse_args()
-    data_sources = args.data_sources.split(',')
+    train_sources = args.train_data_sources.split(',')
+    test_sources = args.test_data_sources.split(',')
 
     train_splits, test_splits = [], []
-    for src in data_sources:
-        train_splits.append(build_split(src, 'train', args.template_type))
 
+    # build training datasets
+    for src in train_sources:
+        train_splits.append(build_split(src, 'train', args.template_type,
+                                        sample_train_size=args.sample_train_size))
+
+    # build test datasets
+    for src in test_sources:
+        # prefer test/dev, fallback to train
         for cand in ['test', 'dev', 'train']:
             if cand in datasets.load_dataset('RUC-NLPIR/FlashRAG_datasets', src):
                 test_splits.append(build_split(src, cand, args.template_type))
@@ -94,12 +107,14 @@ if __name__ == "__main__":
     hdfs_dir = args.hdfs_dir
     os.makedirs(local_dir, exist_ok=True)
 
-    datasets.concatenate_datasets(train_splits).to_parquet(
-        os.path.join(local_dir, "train.parquet")
-    )
-    datasets.concatenate_datasets(test_splits).to_parquet(
-        os.path.join(local_dir, "test.parquet")
-    )
+    if train_splits:
+        datasets.concatenate_datasets(train_splits).to_parquet(
+            os.path.join(local_dir, "train.parquet")
+        )
+    if test_splits:
+        datasets.concatenate_datasets(test_splits).to_parquet(
+            os.path.join(local_dir, "test.parquet")
+        )
 
     if hdfs_dir is not None:
         makedirs(hdfs_dir)
