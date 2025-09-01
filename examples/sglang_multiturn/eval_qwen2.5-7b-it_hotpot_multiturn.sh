@@ -47,7 +47,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.nnodes=1 \
     trainer.save_freq=50 \
     trainer.test_freq=20 \
-    trainer.val_before_train=false \
+    trainer.val_only=true \
+    trainer.val_before_train=true \
     data.train_files=data/hotpotqa/train.parquet \
     data.val_files=data/hotpotqa/test.parquet \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="$PROJECT_DIR/examples/sglang_multiturn/config/tool_config/search_wiki_tool_config.yaml" \
