@@ -75,7 +75,7 @@ def build_split(data_source: str, split: str, template_type: str, sample_train_s
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_dir", default="./data/hotpotqa")
+    parser.add_argument("--local_dir", default="./data/hotpotqa_w_reflect")
     parser.add_argument("--hdfs_dir", default=None)
     parser.add_argument("--template_type", type=str, default="base")
     parser.add_argument("--train_data_sources", default="hotpotqa",
