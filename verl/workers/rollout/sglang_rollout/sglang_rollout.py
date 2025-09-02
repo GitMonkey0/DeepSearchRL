@@ -322,6 +322,15 @@ class SGLangRollout(BaseRollout):
                 self.pad_token_id = self.processing_class.tokenizer.pad_token_id
             except AttributeError as e:
                 raise ValueError(f"Cannot get pad_token_id from processing_class {self.processing_class}") from e
+                
+        self.se = None
+        if self.config.get("enable_self_evolution", False):
+            from verl.workers.rollout.sglang_rollout.se import SE
+            self.se = SE(
+                engine_caller=self.chat_completion,  
+                tokenizer=self.processing_class,
+                **self.config.se,
+            )
 
     def _init_distributed_env(self, device_mesh_cpu, **kwargs):
         self._device_mesh_cpu = device_mesh_cpu
@@ -574,7 +583,15 @@ class SGLangRollout(BaseRollout):
             response_mask: | 1, 1, 1, ..., 1, 1 | 0, 0, .., 0, 0 | 1, 1, 1, ..., 1, 1 | 0, 0, ..., 0|
         """
         if self.config.multi_turn.enable:
-            return self._req_level_generate_sequences(prompts, **kwargs)
+            data = self._req_level_generate_sequences(prompts, **kwargs)
+            if self.se is not None:
+                task_desc = prompts.non_tensor_batch.get("task", "")
+                loop = asyncio.get_event_loop()
+                best_traj = loop.run_until_complete(self.se(task_desc))
+
+                data = self._trajectory_to_dataproto(best_traj)
+
+            return data
         return self._batch_level_generate_sequences(prompts, **kwargs)
 
     @GPUMemoryLogger(role="sglang rollout", logger=logger)
