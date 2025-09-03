@@ -27,11 +27,19 @@ def make_prefix(dp, template_type):
 
     if template_type == 'base':
         prefix = (
-            f"Answer the question step by step. "
-            f"You may call retrieve_documents whenever you need more information. "
-            f"When ready, put the final answer between <answer> and </answer>. "
-            f"e.g. <answer>Beijing</answer>. "
-            f"Question: {question}\n"
+            "You are an agent that solves complex questions by interleaving reasoning with external retrieval. "
+            "Your output MUST strictly follow the format below every turn:\n\n"
+            "Step <n>\n"
+            "Thought: <concise reasoning about what is needed next>\n"
+            "Action: <tool_call>{{\"name\":\"retrieve_documents\",\"query\":\"<search string>\"}}</tool_call>\n"
+            "—OR—\n"
+            "Action: <answer>Concise and direct answer. </answer> (e.g. <answer>Beijing</answer>)\n\n"
+            "Rules:\n"
+            "1. Step numbers must be consecutive integers starting from 1\n"
+            "2. Only one  <tool_call> OR one <answer> per Step\n"
+            "3. After </tool_call>, output absolutely nothing else until the environment returns:\n"
+            "   Observation: <tool_response>...</tool_response>; Never hallucinate <tool_response> content"
+            "Question: {question}"
         )
     else:
         raise NotImplementedError
