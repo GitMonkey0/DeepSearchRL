@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 
 from .sglang_rollout import SGLangRollout
+from .se_rollout import SERollout
 
-__all__ = ["SGLangRollout"]
+__all__ = ["SGLangRollout", "SERollout"]
