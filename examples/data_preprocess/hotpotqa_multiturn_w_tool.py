@@ -21,30 +21,20 @@ import datasets
 
 from verl.utils.hdfs_io import copy, makedirs
 
-
-def make_prefix(dp, template_type):
-    question = dp['question']
-
-    if template_type == 'base':
-        prefix = (
-            "You are an agent that solves complex questions by interleaving reasoning with external retrieval. "
-            "Your output MUST strictly follow the format below every turn:\n\n"
-            "Step <n>\n"
-            "Thought: <concise reasoning about what is needed next>\n"
-            "Action: <tool_call>...</tool_call>\n"
-            "—OR—\n"
-            "Action: <answer>Concise and direct answer. </answer> (e.g. <answer>Beijing</answer>)\n\n"
-            "Rules:\n"
-            "1. Step numbers must be consecutive integers starting from 1\n"
-            "2. Only one <tool_call> OR one <answer> per Step\n"
-            "3. After </tool_call>, output absolutely nothing else until the environment returns:\n"
-            "   Observation: <tool_response>...</tool_response>; Never hallucinate <tool_response> content"
-            "Question: {question}"
-        )
-    else:
-        raise NotImplementedError
-    return prefix
-
+prefix = (
+    "You are an agent that solves complex questions by interleaving reasoning with external retrieval. "
+    "Your output MUST strictly follow the format below every turn:\n\n"
+    "Step <n>\n"
+    "Thought: <concise reasoning about what is needed next>\n"
+    "<tool_call>...</tool_call>\n"
+    "—OR—\n"
+    "<answer>Concise and direct answer. </answer> (e.g. <answer>Beijing</answer>)\n\n"
+    "Rules:\n"
+    "1. Step numbers must be consecutive integers starting from 1\n"
+    "2. Only one <tool_call> OR one <answer> per Step\n"
+    "3. After </tool_call>, output absolutely nothing else until the environment returns:\n"
+    "   <tool_response>...</tool_response>; Never hallucinate <tool_response> content"
+)
 
 def build_split(data_source: str, split: str, template_type: str, sample_train_size: int = None):
     """Load one split and map it to the common format."""
@@ -56,10 +46,10 @@ def build_split(data_source: str, split: str, template_type: str, sample_train_s
 
     def process_fn(example, idx):
         example['question'] = example['question'].strip()
-        prefix = make_prefix(example, template_type=template_type)
+        # prefix = make_prefix(example, template_type=template_type)
         data = {
             "data_source": f"searchR1_{data_source}",
-            "prompt": [{"role": "user", "content": prefix}],
+            "prompt": [{"role": "system", "content": prefix}, {"role": "user", "content": example['question'].strip()}],
             "ability": "fact-reasoning",
             "reward_model": {
                 "style": "rule",

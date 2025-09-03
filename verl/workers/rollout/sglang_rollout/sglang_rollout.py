@@ -584,6 +584,7 @@ class SGLangRollout(BaseRollout):
         """
         if self.config.multi_turn.enable:
             data = self._req_level_generate_sequences(prompts, **kwargs)
+            breakpoint()
             if self.se is not None:
                 task_desc = prompts.non_tensor_batch.get("task", "")
                 loop = asyncio.get_event_loop()
