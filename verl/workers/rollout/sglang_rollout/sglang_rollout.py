@@ -85,6 +85,59 @@ except ImportError:
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
+import re, json
+from typing import Dict, Literal
+def parse_conversation(dialog: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """
+    把对话解析成：
+        think         -> 模型思考
+        search        -> 模型发出的查询
+        information   -> 工具返回
+        answer        -> 最终答案
+    """
+    trace = []
+    step = 1
+
+    for turn in dialog:
+        role = turn.get("role")
+        text = turn.get("content", "")
+        tool_calls = turn.get("tool_calls")
+
+        if role in {"system", "user"}:
+            continue
+
+        # ---------- assistant ----------
+        if role == "assistant":
+            # 1) think
+            m = re.search(r"<think>(.*?)</think>", text, re.S)
+            if m:
+                trace.append({"step": step, "type": "think", "content": m.group(1).strip()})
+                step += 1
+
+            # 2) search（优先 tool_calls，其次正则）
+            if tool_calls:
+                call = tool_calls[0]["function"]  # 只取第一条
+                search_body = json.dumps({"name": call["name"], "arguments": call["arguments"]}, ensure_ascii=False)
+                trace.append({"step": step, "type": "search", "content": search_body})
+                step += 1
+            else:
+                m = re.search(r"<tool_call>(.*?)</tool_call>", text, re.S)
+                if m:
+                    trace.append({"step": step, "type": "search", "content": m.group(1).strip()})
+                    step += 1
+
+            # 3) answer
+            m = re.search(r"<answer>(.*?)</answer>", text, re.S)
+            if m:
+                trace.append({"step": step, "type": "answer", "content": m.group(1).strip()})
+                step += 1
+
+        # ---------- tool ----------
+        elif role == "tool":
+            trace.append({"step": step, "type": "information", "content": text.strip()})
+            step += 1
+
+    return trace
 
 # patch to avoid issue https://github.com/sgl-project/sglang/issues/6723
 def _set_envs_and_config(server_args: ServerArgs):
@@ -584,7 +637,11 @@ class SGLangRollout(BaseRollout):
         """
         if self.config.multi_turn.enable:
             data = self._req_level_generate_sequences(prompts, **kwargs)
-            breakpoint()
+            for _data in data.non_tensor_batch.get("messages", []):
+                messages = _data["messages"]
+                messages = [message.model_dump() for message in messages]
+                parsed_messages = parse_conversation(messages)
+                breakpoint()
             if self.se is not None:
                 task_desc = prompts.non_tensor_batch.get("task", "")
                 loop = asyncio.get_event_loop()

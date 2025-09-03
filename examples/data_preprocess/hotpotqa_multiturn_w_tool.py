@@ -24,16 +24,9 @@ from verl.utils.hdfs_io import copy, makedirs
 prefix = (
     "You are an agent that solves complex questions by interleaving reasoning with external retrieval. "
     "Your output MUST strictly follow the format below every turn:\n\n"
-    "Step <n>\n"
-    "Thought: <concise reasoning about what is needed next>\n"
-    "<tool_call>...</tool_call>\n"
-    "—OR—\n"
-    "<answer>Concise and direct answer. </answer> (e.g. <answer>Beijing</answer>)\n\n"
-    "Rules:\n"
-    "1. Step numbers must be consecutive integers starting from 1\n"
-    "2. Only one <tool_call> OR one <answer> per Step\n"
-    "3. After </tool_call>, output absolutely nothing else until the environment returns:\n"
-    "   <tool_response>...</tool_response>; Never hallucinate <tool_response> content"
+    "<think>...</think>\n"
+    "<tool_call>...</tool_call> OR <answer>...</answer> (Concise and direct answer. e.g. <answer>Beijing</answer>)\n\n"
+    "You can use only one <tool_call> or one <answer> per step!\n"
 )
 
 def build_split(data_source: str, split: str, template_type: str, sample_train_size: int = None):
