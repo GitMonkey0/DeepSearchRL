@@ -22,11 +22,11 @@ import datasets
 from verl.utils.hdfs_io import copy, makedirs
 
 prefix = (
-    "You are an agent that solves complex questions by interleaving reasoning with external retrieval. "
-    "Your output MUST strictly follow the format below every turn:\n\n"
-    "<think>...</think>\n"
-    "<tool_call>...</tool_call> OR <answer>...</answer> (Concise and direct answer. e.g. <answer>Beijing</answer>)\n\n"
-    "You can use only one <tool_call> or one <answer> per step!\n"
+    "You are an agent that solves complex questions by interleaving reasoning and external retrieval. "
+    "First, briefly outline your high-level plan. "
+    "Whenever you need more information, you MUST perform exactly one tool call to search relevant documents. "
+    "After receiving the response, you may start a new turn with exactly one tool call or directly and concisely answer as <answer>...</answer>. "
+    "Example: <answer>Beijing</answer>\n"
 )
 
 def build_split(data_source: str, split: str, template_type: str, sample_train_size: int = None):

@@ -1,6 +1,7 @@
 # from __future__ import annotations
 
-# import asyncio
+import asyncio
+import aiohttp
 # import math
 # import random
 # from dataclasses import dataclass, field
@@ -17,6 +18,7 @@ import logging
 from verl.utils.profiler import GPUMemoryLogger
 import torch
 from verl import DataProto
+import numpy as np
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -28,10 +30,21 @@ class SERollout(SGLangRollout):
     def _parse_conversation(self, dialog: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """
         Parse the conversation into a structured trace.
+        step 0 固定为 user 的初始问题，后续 assistant/tool 从 step 1 开始递增。
         """
         trace = []
-        step = 1
+        step = 0  
 
+        # --- 先把 user 的初始问题写进去 ---
+        for turn in dialog:
+            if turn.get("role") == "user":
+                text = turn.get("content", "").strip()
+                if text:
+                    trace.append({"step": step, "type": "user", "content": text})
+                    step += 1
+                break   # 只要第一条 user
+
+        # --- 后面正常解析 assistant / tool ---
         for turn in dialog:
             role = turn.get("role")
             text = turn.get("content", "")
@@ -42,21 +55,23 @@ class SERollout(SGLangRollout):
 
             # ---------- assistant ----------
             if role == "assistant":
-                # 1) think
-                m = re.search(r"<think>(.*?)</think>", text, re.S)
-                if m:
-                    trace.append({"step": step, "type": "think", "content": m.group(1).strip()})
+                # 1) think：整段内容
+                if text.strip():
+                    trace.append({"step": step, "type": "think", "content": text.strip()})
                     step += 1
 
-                # 2) search（优先 tool_calls，其次正则）
+                # 2) search
                 if tool_calls:
-                    call = tool_calls[0]["function"]  # 只取第一条
-                    search_body = json.dumps({"name": call["name"], "arguments": call["arguments"]}, ensure_ascii=False)
-                    trace.append({"step": step, "type": "search", "content": search_body})
-                    step += 1
+                    for call in tool_calls:
+                        search_body = json.dumps(
+                            {"name": call["function"]["name"],
+                            "arguments": call["function"]["arguments"]},
+                            ensure_ascii=False
+                        )
+                        trace.append({"step": step, "type": "search", "content": search_body})
+                        step += 1
                 else:
-                    m = re.search(r"<tool_call>(.*?)</tool_call>", text, re.S)
-                    if m:
+                    for m in re.finditer(r"<tool_call>(.*?)</tool_call>", text, re.S):
                         trace.append({"step": step, "type": "search", "content": m.group(1).strip()})
                         step += 1
 
@@ -73,8 +88,111 @@ class SERollout(SGLangRollout):
 
         return trace
     
-    def _revision(init_traj):
-        pass
+    # async def _revision_one(self, traj: List[Dict[str, Any]],
+    #                         sem: asyncio.Semaphore) -> List[Dict[str, Any]]:
+    #     """
+    #     对单条轨迹做 revision。
+    #     """
+    #     async with sem:                     
+    #         messages = self._traj_to_messages(traj)   
+    #         revised_text = await _call_llm(messages)
+    #         new_traj = self._parse_conversation(
+    #             [{"role": "assistant", "content": revised_text}]
+    #         )
+    #         return new_traj
+
+    # def _revision(self, init_traj: List[List[Dict[str, Any]]]) -> List[List[Dict[str, Any]]]:
+    #     """
+    #     并发 revision。
+    #     由于 _revision 本身是 sync 函数，用一次 run_until_complete。
+    #     """
+    #     async def _run():
+    #         max_concurrency = 64
+    #         sem = asyncio.Semaphore(max_concurrency)
+    #         tasks = [self._revision_one(traj, sem) for traj in init_traj]
+    #         return await asyncio.gather(*tasks)
+
+    #     loop = asyncio.get_event_loop()
+    #     return loop.run_until_complete(_run())
+
+    def _revision(self, init_traj: List[List[Dict[str, Any]]]):
+        """
+        并发 revision。
+        由于 _revision 本身是 sync 函数，用一次 run_until_complete。
+        """
+        data = [self._traj_to_messages(traj) for traj in init_traj]
+        texts = self.processing_class.apply_chat_template(
+            data,          
+            tokenize=False,         
+            add_generation_prompt=True,
+        )
+        model_inputs = self.processing_class(
+            texts,
+            padding=True,
+            return_tensors="pt",    
+            padding_side="left"
+        )
+        position_ids = model_inputs.attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(model_inputs.attention_mask == 0, 0)
+        inputs = DataProto.from_dict(
+            tensors = {
+                "input_ids": model_inputs.input_ids,
+                "attention_mask": model_inputs.attention_mask,
+                "position_ids": position_ids
+            },
+            non_tensors = {
+                "raw_prompt": np.array(data, dtype=object),
+                "raw_prompt_ids": np.array(model_inputs.input_ids, dtype=object),
+                "index": np.array([0] * len(data), dtype=object),
+                "tools_kwargs": np.array([{"retrieve_documents": {"create_kwargs": {"": ""}}}] * len(data), dtype=object)
+            }
+        )
+        kwargs = {"max_prompt_len": 4096}
+        breakpoint()
+        outputs = self._req_level_generate_sequences(inputs, **kwargs)
+
+        return outputs
+
+
+    def _traj_to_messages(self, traj: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        """
+        把结构化轨迹还原成对话格式，用于 prompt LLM。
+        """
+        system_prompt = '''
+            You are an expert in analyzing agent trajectories.  
+            Please identify the **single most decisive critical decision point** in the entire trajectory.  
+            A “critical decision point” is the one step that most strongly determines whether the overall solution succeeds or fails, typically characterized by:
+
+            - Accurately locating the core of the problem  
+            - Discovering the breakthrough for the solution  
+            - Making a decisive modification or judgment  
+            - Establishing the correct execution path  
+
+            You must read the whole trajectory, find this **one** most critical step, and provide:
+
+            - **step number**  
+            - **why** this step is the most critical  
+            - **impact** it has on the final solution  
+
+            Your output must strictly follow the JSON format below, containing a `critical_step` object with the following fields:
+
+            ```json
+            {
+            "critical_step": {
+                "step": <integer>,
+                "type": "<string>",
+                "reasoning": "<string>",
+                "impact": "<string>"
+            }
+            }
+        '''
+
+        msgs = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": str(traj)}  
+        ]
+
+        return msgs
 
     def _recombine():
         pass
@@ -85,18 +203,63 @@ class SERollout(SGLangRollout):
     @GPUMemoryLogger(role="sglang rollout", logger=logger)
     @torch.no_grad()
     def generate_sequences(self, prompts: DataProto, **kwargs) -> DataProto:
-        breakpoint()
+        # breakpoint()
         init_traj = self._req_level_generate_sequences(prompts, **kwargs)
         traj_formatted = []
         for m in init_traj.non_tensor_batch.get("messages", []):
             messages = [message.model_dump() for message in m["messages"]]
             traj_formatted.append(self._parse_conversation(messages))
-
+        # breakpoint()
         revision_traj = self._revision(traj_formatted)
         recombination_traj = self._recombine(revision_traj)
         refinement_traj = self._refine(recombination_traj)
 
         return refinement_traj
+    
+    async def _call_llm(messages: List[Dict[str, str]], max_concurrency: int = 16) -> str:
+        """
+        虚拟 LLM：随机挑一条轨迹里的 step 作为 critical_step。
+        返回合法的 JSON string，可直接被 json.loads。
+        """
+        # messages 的最后一个元素是用户输入的 str(traj)
+        traj_str = messages[-1]["content"]
+        # 简易解析：把所有 "step": <int> 抓出来
+        steps = list(map(int, re.findall(r'"step":\s*(\d+)', traj_str)))
+        if not steps:
+            steps = [1]
+
+        chosen = random.choice(steps)
+        fake = {
+            "critical_step": {
+                "step": chosen,
+                "type": "think",               # 可以随机挑 think/search/answer
+                "reasoning": f"Step {chosen} is the breakthrough.",
+                "impact": "Determines final correctness."
+            }
+        }
+        return json.dumps(fake, ensure_ascii=False)
+
+    # async def _call_llm(messages: List[Dict[str, str]],
+    #                     max_concurrency: int = 16) -> str:
+    #     """
+    #     真正向 LLM 发起请求。
+    #     这里以 HTTP 为例；如果直接调 SGLang 的 async_generate，同理。
+    #     """
+    #     # 举例：通过 HTTP 访问本地 SGLang server
+    #     url = "http://localhost:8000/v1/chat/completions"
+
+    #     payload = {
+    #         "model": "sglang_model",
+    #         "messages": messages,
+    #         "max_tokens": 512,
+    #         "temperature": 0.7,
+    #     }
+
+    #     async with aiohttp.ClientSession() as session:
+    #         async with session.post(url, json=payload) as resp:
+    #             data = await resp.json()
+    #             return data["choices"][0]["message"]["content"]
+
 
     # async def _async_rollout_a_request(self, req, **kwargs):
     #     # your SE logic
