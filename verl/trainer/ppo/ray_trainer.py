@@ -1158,6 +1158,7 @@ class RayPPOTrainer:
                     batch_keys=batch_keys_to_pop,
                     non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
                 )
+                gen_batch.non_tensor_batch["golden_answers"] = batch.non_tensor_batch.get("golden_answers", None)
 
                 # pass global_steps to trace
                 gen_batch.meta_info["global_steps"] = self.global_steps
