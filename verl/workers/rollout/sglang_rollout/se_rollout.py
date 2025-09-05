@@ -364,8 +364,8 @@ class SERollout(SGLangRollout):
         revised_traj.non_tensor_batch["fused_traj_str"] = np.array(final_ordered, dtype=object)
         return revised_traj
 
-    def _refine():
-        pass
+    def _refine(prompts, restruct_traj):
+        return restruct_traj
 
     @GPUMemoryLogger(role="sglang rollout", logger=logger)
     @torch.no_grad()
