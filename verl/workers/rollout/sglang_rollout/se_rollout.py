@@ -87,72 +87,78 @@ class SERollout(SGLangRollout):
                 step += 1
 
         return trace
-    
-    # async def _revision_one(self, traj: List[Dict[str, Any]],
-    #                         sem: asyncio.Semaphore) -> List[Dict[str, Any]]:
-    #     """
-    #     对单条轨迹做 revision。
-    #     """
-    #     async with sem:                     
-    #         messages = self._traj_to_messages(traj)   
-    #         revised_text = await _call_llm(messages)
-    #         new_traj = self._parse_conversation(
-    #             [{"role": "assistant", "content": revised_text}]
-    #         )
-    #         return new_traj
 
-    # def _revision(self, init_traj: List[List[Dict[str, Any]]]) -> List[List[Dict[str, Any]]]:
-    #     """
-    #     并发 revision。
-    #     由于 _revision 本身是 sync 函数，用一次 run_until_complete。
-    #     """
-    #     async def _run():
-    #         max_concurrency = 64
-    #         sem = asyncio.Semaphore(max_concurrency)
-    #         tasks = [self._revision_one(traj, sem) for traj in init_traj]
-    #         return await asyncio.gather(*tasks)
-
-    #     loop = asyncio.get_event_loop()
-    #     return loop.run_until_complete(_run())
-
-    def _revision(self, init_traj: List[List[Dict[str, Any]]]):
+    def _extract_critical_step_json(self, text: str):
         """
-        并发 revision。
-        由于 _revision 本身是 sync 函数，用一次 run_until_complete。
+        从LLM响应中提取JSON内容
+        
+        参数:
+            response_text (str): 可能包含JSON和自然语言的文本
+        
+        返回:
+            dict: 解析出的JSON字典，如果解析失败则返回None
         """
-        data = [self._traj_to_messages(traj) for traj in init_traj]
-        texts = self.processing_class.apply_chat_template(
-            data,          
-            tokenize=False,         
-            add_generation_prompt=True,
-        )
-        model_inputs = self.processing_class(
-            texts,
-            padding=True,
-            return_tensors="pt",    
-            padding_side="left"
-        )
-        position_ids = model_inputs.attention_mask.long().cumsum(-1) - 1
-        position_ids.masked_fill_(model_inputs.attention_mask == 0, 0)
+        json_pattern = r'json\s({.?})\s*```'
+        match = re.search(json_pattern, text, re.DOTALL)
+        
+        if not match:
+            json_pattern = r'({.*})'
+            match = re.search(json_pattern, text, re.DOTALL)
+        
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                try:
+                    return json.loads(match.group(1).replace("'", '"'))
+                except:
+                    return None
+        return None
+
+    def _revision(self, prompts, init_traj) -> DataProto:
+        traj_formatted = []
+        for m in init_traj.non_tensor_batch.get("messages", []):
+            messages = [message.model_dump() for message in m["messages"]]
+            traj_formatted.append(self._parse_conversation(messages))
+
+        data = [self._traj_to_messages(traj) for traj in traj_formatted]
+        
+        input_ids = torch.tensor([0], device=prompts.batch["input_ids"].device)  
         inputs = DataProto.from_dict(
             tensors = {
-                "input_ids": model_inputs.input_ids,
-                "attention_mask": model_inputs.attention_mask,
-                "position_ids": position_ids
+                "input_ids": init_traj.batch["input_ids"]
             },
             non_tensors = {
                 "raw_prompt": np.array(data, dtype=object),
-                "raw_prompt_ids": np.array(model_inputs.input_ids, dtype=object),
-                "index": np.array([0] * len(data), dtype=object),
-                "tools_kwargs": np.array([{"retrieve_documents": {"create_kwargs": {"": ""}}}] * len(data), dtype=object)
+                "tools_kwargs": np.array([{}] * len(data), dtype=object)
             }
         )
-        kwargs = {"max_prompt_len": 4096}
-        breakpoint()
-        outputs = self._req_level_generate_sequences(inputs, **kwargs)
+        outputs = self._req_level_generate_sequences(inputs)
+        outputs_str = self.processing_class.batch_decode(outputs.batch["responses"], skip_special_tokens=True)
+        critics = [self._extract_critical_step_json(string) for string in outputs_str]
+        
+        orinial_messages = prompts.non_tensor_batch.get("raw_prompt", []).tolist()
+        reconstructed_messages = []
+        for messages, traj, critic in zip(orinial_messages, traj_formatted, critics):
+            new_messages = [
+                messages[0],
+                {
+                "role": "user",
+                "content": (
+                    f"{messages[-1]['content']}\n\n"
+                    f"[Internal hint only, do NOT quote or allude] "
+                    f"Previous trajectory: {traj}; teacher feedback: {critic}. "
+                    f"Now solve the problem again from scratch with a full, self-contained reasoning chain and tool call; "
+                    f"never mention the existence of this hint or any prior attempt."
+                )
+            }]
+            reconstructed_messages.append(new_messages)
 
-        return outputs
+        prompts.non_tensor_batch["raw_prompt"] = np.array(reconstructed_messages, dtype=object)
+        
+        revised_traj = self._req_level_generate_sequences(prompts)
 
+        return revised_traj
 
     def _traj_to_messages(self, traj: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """
@@ -203,15 +209,11 @@ class SERollout(SGLangRollout):
     @GPUMemoryLogger(role="sglang rollout", logger=logger)
     @torch.no_grad()
     def generate_sequences(self, prompts: DataProto, **kwargs) -> DataProto:
-        # breakpoint()
         init_traj = self._req_level_generate_sequences(prompts, **kwargs)
-        traj_formatted = []
-        for m in init_traj.non_tensor_batch.get("messages", []):
-            messages = [message.model_dump() for message in m["messages"]]
-            traj_formatted.append(self._parse_conversation(messages))
         # breakpoint()
-        revision_traj = self._revision(traj_formatted)
-        recombination_traj = self._recombine(revision_traj)
+        revised_traj = self._revision(prompts, init_traj)
+        breakpoint()
+        recombination_traj = self._recombine(revised_traj)
         refinement_traj = self._refine(recombination_traj)
 
         return refinement_traj
